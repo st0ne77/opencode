@@ -53,6 +53,13 @@ def install_agents() -> int:
     backup_if_exists(dst)
     shutil.copy2(src, dst)
     log("已安装用户级 AGENTS.md -> %s" % dst)
+
+    sample_src = REPO_DIR / "dev.sample.md"
+    if sample_src.is_file():
+        sample_dst = USER_CONFIG_DIR / "dev.sample.md"
+        backup_if_exists(sample_dst)
+        shutil.copy2(sample_src, sample_dst)
+        log("已安装示例配置 -> %s" % sample_dst)
     return 0
 
 

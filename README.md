@@ -11,6 +11,7 @@ opencode-config/
 ├── README.md                # 本文件
 ├── install.py               # 跨平台安装脚本
 ├── AGENTS.md                # opencode 全局规则（安装到 ~/.config/opencode/AGENTS.md）
+├── dev.sample.md            # 本地环境配置示例（安装到 ~/.config/opencode/dev.sample.md）
 ├── opencode.json            # 项目级配置（仅 permission，安装到项目根 opencode.json）
 └── .opencode/script/
     ├── run_cmd.py           # 统一命令执行器
@@ -64,6 +65,14 @@ Windows 下若 `python` 不可用，改用 `python3`。
 | `-p` / `--project DIR` | 安装项目级配置 + 执行器 | `<DIR>/opencode.json` 与 `<DIR>/.opencode/script/run_cmd.py` |
 
 安装完成后**重启 opencode** 使权限生效。
+
+### 本地环境配置（dev.md）
+
+每台机器的数据库连接、内网地址等本机信息放在 `~/.config/opencode/dev.md`，**该文件不入库**。
+
+- `-a` 会把仓库里的 `dev.sample.md` 安装到 `~/.config/opencode/dev.sample.md` 作为示例模板。
+- 需要本地环境配置时，把 `dev.sample.md` 复制为同目录的 `dev.md`，填入本机真实值。
+- `dev.md` 不存在时，agent 会静默跳过读取，不报错。
 
 > 项目级 `opencode.json` 放在**项目根目录**（opencode 文档规定项目配置位于项目根；配置文件是合并语义，项目级覆盖全局级）。
 

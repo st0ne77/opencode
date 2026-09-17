@@ -5,3 +5,4 @@
 # 本地真实配置（含密钥，绝不入库）
 opencode.local.json
 .env
+dev.md
