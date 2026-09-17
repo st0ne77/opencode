@@ -5,6 +5,9 @@
       "*": "deny",
       "python .opencode/script/run_cmd.py*": "allow",
       "python3 .opencode/script/run_cmd.py*": "allow"
+    },
+    "external_directory": {
+      "C:/Users/65001/.config/opencode/dev.md": "allow"
     }
   }
 }
