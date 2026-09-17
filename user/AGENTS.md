@@ -31,7 +31,24 @@
 - 命令原文直接写进 cmd.txt，不要再操心 shell 转义：`$`、`%`、`&`、管道、重定向均可按目标 shell 语法原样书写。
 - 交互式命令无法实时双向交互（opencode 不提供实时 stdin 通道），只能把已知输入预置到 input.txt 一次性投喂；需要真实时交互时停下来告知我。
 - 常见坑：`echo 中文` 这类由 cmd.exe 内建命令产生的中文，仍可能按 GBK 输出导致乱码；需要输出中文时优先用 python 产生（python 全程 UTF-8）。
-- 常驻服务禁止前台启动（会阻塞 python 通道导致会话卡死）：命令原文用 `start "" /b <exe> <args>` 或脚本内 `Popen(DETACHED_PROCESS)` 后台启动，启动后 sleep 再检查端口/进程确认成功。
+
+### 常驻服务启动规则（禁止死等）
+
+常驻服务（appium、daemon、server 等）**必须"启动即返回"，绝不能让 run_cmd.py 等它退出**。每次现写 python 命令实现，不依赖任何辅助脚本。
+
+- **严禁**会阻塞/继承句柄的写法：
+  - ❌ `start "" /b cmd /c "服务 ..."` —— 子进程继承 stdout/stderr 句柄，run_cmd.py 读管道会一直等到服务退出（死等 600 秒）。
+  - ❌ 直接前台执行服务程序。
+- **正确做法**：cmd.txt 中写一条 python `-c` 命令，用 `Popen` 非阻塞启动，**三个流全部指向空设备**并脱离父进程，例如：
+
+  ```
+  python -c "import subprocess,sys;subprocess.Popen(['D:\\path\\appium.cmd','--port','4723'],creationflags=subprocess.DETACHED_PROCESS|subprocess.CREATE_NEW_PROCESS_GROUP,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);print('launched')"
+  ```
+
+  - 关键点：`DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` + `stdin/stdout/stderr=DEVNULL`。
+  - Linux 用 `start_new_session=True` 替代 `creationflags`。
+- 启动后**立即返回**，随后用独立的短命令检查端口/进程确认服务就绪，再继续后续操作。
+- run_cmd.py 对超时**一律杀掉整棵进程树**（Windows `taskkill /F /T`，Linux `killpg`），无需也不允许 AI 自行决定是否杀进程。
 
 ## 本地环境配置（dev.md）
 

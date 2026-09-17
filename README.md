@@ -27,7 +27,7 @@ opencode-config/
 | 层 | 机制 | 作用 |
 |---|---|---|
 | L1 | `user/AGENTS.md` 规则 | 要求所有命令走 python 通道（软约束） |
-| L2 | `run_cmd.py` | 强制 UTF-8 输出、统一读 cmd.txt、预置 stdin、超时与退出码回传 |
+| L2 | `run_cmd.py` | 强制 UTF-8 输出、统一读 cmd.txt、预置 stdin、超时杀进程树、退出码回传 |
 | L3 | `user/opencode.json` 权限 | `bash` 全 `deny`，仅放行 python 通道（硬拦截） |
 
 ### 命令执行流程
@@ -37,6 +37,12 @@ opencode-config/
 3. 脚本读 cmd.txt，以项目根为 cwd 用 cmd.exe 执行，输出统一 UTF-8
 
 需要 stdin 输入时，写入 `.opencode/script/input.txt`，脚本会一次性投喂。
+
+### 超时看门狗
+
+- 默认超时 600 秒（可用环境变量 `RUN_CMD_TIMEOUT` 覆盖，`0` 表示不限制）。
+- **超时后强制杀掉整棵进程树**：Windows 用 `taskkill /F /T /PID`，Linux 用 `killpg`。避免后台服务残留或会话死等。
+- 常驻服务（appium/server 等）必须用 python `Popen` + `DETACHED_PROCESS` + `DEVNULL` 启动，启动即返回，**绝不**让 run_cmd.py 等它退出。
 
 ## 已知限制
 
