@@ -1,0 +1,7 @@
+# 运行时产物
+.opencode/script/cmd.txt
+.opencode/script/input.txt
+
+# 本地真实配置（含密钥，绝不入库）
+opencode.local.json
+.env
