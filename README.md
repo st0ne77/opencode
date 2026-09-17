@@ -8,11 +8,13 @@ opencode 的跨设备同步配置仓库（私有）。
 
 ```
 opencode-config/
+├── AGENTS.md                # 本项目目的说明（同时被 opencode 当规则加载）
 ├── README.md                # 本文件
 ├── install.py               # 跨平台安装脚本
-├── AGENTS.md                # opencode 全局规则（安装到 ~/.config/opencode/AGENTS.md）
-├── dev.sample.md            # 本地环境配置示例（安装到 ~/.config/opencode/dev.sample.md）
-├── opencode.json            # 项目级配置（仅 permission，安装到项目根 opencode.json）
+├── user/                    # 部署源（会被 install.py 安装到目标机器）
+│   ├── AGENTS.md            # 全局规则 -> ~/.config/opencode/AGENTS.md
+│   ├── dev.sample.md        # 本地环境配置示例 -> ~/.config/opencode/dev.sample.md
+│   └── opencode.json        # 项目级权限 -> <项目根>/opencode.json
 └── .opencode/script/
     ├── run_cmd.py           # 统一命令执行器
     └── .gitignore           # 忽略 cmd.txt / input.txt
@@ -24,9 +26,9 @@ opencode-config/
 
 | 层 | 机制 | 作用 |
 |---|---|---|
-| L1 | `AGENTS.md` 规则 | 要求所有命令走 python 通道（软约束） |
+| L1 | `user/AGENTS.md` 规则 | 要求所有命令走 python 通道（软约束） |
 | L2 | `run_cmd.py` | 强制 UTF-8 输出、统一读 cmd.txt、预置 stdin、超时与退出码回传 |
-| L3 | `opencode.json` 权限 | `bash` 全 `deny`，仅放行 `python .opencode/script/run_cmd.py`（硬拦截） |
+| L3 | `user/opencode.json` 权限 | `bash` 全 `deny`，仅放行 python 通道（硬拦截） |
 
 ### 命令执行流程
 
@@ -43,6 +45,13 @@ opencode-config/
 - **转义未 100% 消除**：`shell=True` 走 cmd.exe，`%`、`&` 仍按 cmd 规则解释；消除的是 PowerShell 那层与编码乱码。
 - 权限为 `"*": "deny"` 单条放行，容错为零：若匹配失败会锁死会话，需手动把 `"*"` 改回 `"ask"` 排障。
 
+### 权限配置要点（`user/opencode.json`）
+
+- `external_directory` 放行 `~/.config/opencode/**`，使 agent 能跨机器免申请读取 `dev.md` / `AGENTS.md`。
+  - 注意：`external_directory` 必须用**目录通配 `**`**，精确到具体文件不生效。
+- `edit` 对 `~/.config/opencode/**` 设为 `ask`：改动该目录下的配置文件需要审批，防止密钥被篡改。
+- `read` 拒绝读取 `.env`、`*.pem`、`*.key`、`id_rsa*`、`.npmrc`、`.netrc`、`credentials*` 等敏感文件（但允许覆盖编辑）。
+
 ## 新设备部署
 
 使用 `install.py`（跨平台，Windows / Linux 通用）。**必须显式指定安装项，脚本不默认安装任何内容。**
@@ -51,7 +60,7 @@ opencode-config/
 git clone https://github.com/st0ne77/opencode.git
 cd opencode
 
-python install.py -a                     # 安装用户级 AGENTS.md
+python install.py -a                     # 安装用户级 AGENTS.md + dev.sample.md
 python install.py -p <项目根目录>         # 安装项目级配置到指定项目
 python install.py -a -p <项目根目录>      # 两者都安装
 python install.py                        # 仅打印用法
@@ -61,7 +70,7 @@ Windows 下若 `python` 不可用，改用 `python3`。
 
 | 参数 | 说明 | 目标位置 |
 |---|---|---|
-| `-a` / `--agents` | 安装用户级规则 | `~/.config/opencode/AGENTS.md`（已存在则备份 `.bak`） |
+| `-a` / `--agents` | 安装用户级规则与示例 | `~/.config/opencode/AGENTS.md`、`~/.config/opencode/dev.sample.md`（已存在则备份 `.bak`） |
 | `-p` / `--project DIR` | 安装项目级配置 + 执行器 | `<DIR>/opencode.json` 与 `<DIR>/.opencode/script/run_cmd.py` |
 
 安装完成后**重启 opencode** 使权限生效。

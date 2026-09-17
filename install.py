@@ -9,9 +9,10 @@
     python install.py                        # 打印用法
 
 说明:
-    -a/--agents   复制 <repo>/AGENTS.md 到 ~/.config/opencode/AGENTS.md（已存在则备份 .bak）
+    -a/--agents   复制 <repo>/user/AGENTS.md 到 ~/.config/opencode/AGENTS.md（已存在则备份 .bak），
+                  并复制 <repo>/user/dev.sample.md 到 ~/.config/opencode/dev.sample.md
     -p/--project  在 <项目根>/.opencode/script/ 下部署 run_cmd.py，
-                  并把 opencode.json 复制到 <项目根>/opencode.json
+                  并把 <repo>/user/opencode.json 复制到 <项目根>/opencode.json
 
 Windows 与 Linux 通用；用户配置目录统一为 ~/.config/opencode。
 """
@@ -22,6 +23,7 @@ import sys
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parent
+USER_DIR = REPO_DIR / "user"
 USER_CONFIG_DIR = Path.home() / ".config" / "opencode"
 
 
@@ -44,9 +46,9 @@ def backup_if_exists(path: Path) -> None:
 
 
 def install_agents() -> int:
-    src = REPO_DIR / "AGENTS.md"
+    src = USER_DIR / "AGENTS.md"
     if not src.is_file():
-        sys.stderr.write("[错误] 仓库中缺少 AGENTS.md: %s\n" % src)
+        sys.stderr.write("[错误] 仓库中缺少 user/AGENTS.md: %s\n" % src)
         return 1
     dst = USER_CONFIG_DIR / "AGENTS.md"
     USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -54,7 +56,7 @@ def install_agents() -> int:
     shutil.copy2(src, dst)
     log("已安装用户级 AGENTS.md -> %s" % dst)
 
-    sample_src = REPO_DIR / "dev.sample.md"
+    sample_src = USER_DIR / "dev.sample.md"
     if sample_src.is_file():
         sample_dst = USER_CONFIG_DIR / "dev.sample.md"
         backup_if_exists(sample_dst)
@@ -79,9 +81,9 @@ def install_project(project: str) -> int:
     shutil.copy2(runner_src, runner_dst)
     log("已安装命令执行器 -> %s" % runner_dst)
 
-    config_src = REPO_DIR / "opencode.json"
+    config_src = USER_DIR / "opencode.json"
     if not config_src.is_file():
-        sys.stderr.write("[错误] 仓库中缺少 opencode.json: %s\n" % config_src)
+        sys.stderr.write("[错误] 仓库中缺少 user/opencode.json: %s\n" % config_src)
         return 1
     config_dst = root / "opencode.json"
     backup_if_exists(config_dst)
@@ -99,7 +101,7 @@ def main() -> int:
     )
     parser.add_argument(
         "-a", "--agents", action="store_true",
-        help="安装用户级 AGENTS.md 到 ~/.config/opencode/AGENTS.md",
+        help="安装用户级 AGENTS.md 和 dev.sample.md 到 ~/.config/opencode/",
     )
     parser.add_argument(
         "-p", "--project", metavar="DIR",

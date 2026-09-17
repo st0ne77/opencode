@@ -1,42 +1,60 @@
-# GENERAL RULES
+# 本项目的目的
 
-1.始终以简体中文输出计划和回复。
-2.每次回复都叫我老大。
-3.不要假设我清楚自己想要什么，动机或目标不清晰时，停下来讨论。
-4.我发出的指令目标清晰但方案不是最佳，直接告诉我并建议更好的办法。
-5.遇到问题追根因，不打补丁。每个决策都要能回答"为什么”。
-6.不要过度考虑边界，当前项目中不可能出现的边界情况不需要处理。
-7.如你认为某个目录为空，**必须**再用dir命令验证一次。
-8.先读后写，每次修改文件之前都要重新读取目标文件的最新内容。
-10.只读必要的文件
-11.如果验证连接的是本地服务，禁止通过端口找进程去读服务源码
-12.禁止对wsl进行读写等操作
-13.自动测试验证过程中以主要目标为第一目的，中间如果发现其它问题先记录，搞定主要问题后请示我是否需要继续刚才发现的问题
+这是一个**跨设备同步的 opencode 配置仓库**（私有），不是业务代码项目。
 
-## 统一命令执行协议（最高优先级，覆盖其它所有命令规则）
+## 要解决的问题
 
-**所有 shell 命令必须且只能通过 python 通道执行，opencode 权限已硬性拦截其它所有 bash 命令。**
+Windows 下 AI 助手执行 shell 命令时会持续踩坑：
 
-- 唯一被放行的命令是（二选一，先探测哪个可用）：
-  - Windows 通常：`python .opencode/script/run_cmd.py`
-  - Linux 通常：`python3 .opencode/script/run_cmd.py`
-  - **首次使用前先探测**：`python --version` 可用则用 `python`，否则用 `python3`（两者都已在权限中放行）。
-  - **路径必须写正斜杠**，与权限配置字面严格一致；写成反斜杠会被拒绝。
-  - 不需要、也不允许追加其它参数。
-- 执行任何命令的标准两步流程：
-  1. 用 write 工具把命令原文写入 `<工作目录>/.opencode/script/cmd.txt`（UTF-8）。
-  2. 调用 `python .opencode/script/run_cmd.py`（Linux 用 `python3`）执行。
-- 需要向子进程 stdin 提供输入时，用 write 工具把输入内容写入 `<工作目录>/.opencode/script/input.txt`（UTF-8），执行器会一次性投喂。
-- `.opencode/script/` 目录或 `run_cmd.py` 不存在时，先用 write 工具创建（write 工具不受 bash 权限限制）。
-- 命令原文直接写进 cmd.txt，不要再操心 shell 转义：`$`、`%`、`&`、管道、重定向均可按目标 shell 语法原样书写。
-- 交互式命令无法实时双向交互（opencode 不提供实时 stdin 通道），只能把已知输入预置到 input.txt 一次性投喂；需要真实时交互时停下来告知我。
-- 常见坑：`echo 中文` 这类由 cmd.exe 内建命令产生的中文，仍可能按 GBK 输出导致乱码；需要输出中文时优先用 python 产生（python 全程 UTF-8）。
-- 常驻服务禁止前台启动（会阻塞 python 通道导致会话卡死）：命令原文用 `start "" /b <exe> <args>` 或脚本内 `Popen(DETACHED_PROCESS)` 后台启动，启动后 sleep 再检查端口/进程确认成功。
+1. **字符编码**：PowerShell / cmd.exe 默认 GBK，中文输出经常乱码。
+2. **转义地狱**：cmd 与 git bash 转义规则不同（`^` vs `\`、`%VAR%` vs `$VAR`），而且 opencode 的环境里两种 shell 都可能出现，无法预判。
 
-## 本地环境配置（dev.md）
+## 解决思路
 
-`~/.config/opencode/dev.md` 是我本机的开发环境配置（数据库连接、内网服务地址等），**该文件可能不存在**。
+把**所有 shell 命令统一收敛到一条 python 通道**：
 
-- 每次会话开始后，无条件用 Read 工具读取该文件，不要等我提及数据库或环境需求。
-- 读取失败（文件不存在）时：静默跳过，不报错、不重试、不询问，按无该配置继续。
-- 读取成功时：其中内容视为强制生效的本地配置。
+```
+write 命令原文到 .opencode/script/cmd.txt
+        ↓
+python .opencode/script/run_cmd.py  执行
+        ↓
+python 强制 UTF-8 输出，彻底绕开 shell 转义与编码差异
+```
+
+三层机制：
+
+| 层 | 位置 | 作用 |
+|---|---|---|
+| 规则 | `user/AGENTS.md` | 要求所有命令走 python 通道（软约束） |
+| 执行器 | `.opencode/script/run_cmd.py` | 读 cmd.txt、强制 UTF-8、逐行执行、超时/退出码回传 |
+| 权限 | `user/opencode.json` | `bash` 全 deny，仅放行 python 通道（硬拦截） |
+
+## 目录结构
+
+```
+opencode/
+├── AGENTS.md                  # 本文件：项目目的说明（同时会被 opencode 当规则加载）
+├── README.md                  # 详细说明与部署文档
+├── install.py                 # 跨平台安装脚本
+├── user/                      # 部署物（会被 install.py 安装到目标机器）
+│   ├── AGENTS.md              # 全局规则模板 -> ~/.config/opencode/AGENTS.md
+│   ├── opencode.json          # 项目级权限模板 -> <项目根>/opencode.json
+│   └── dev.sample.md          # 本地环境配置示例 -> ~/.config/opencode/dev.sample.md
+└── .opencode/script/
+    ├── run_cmd.py             # 命令执行器
+    └── .gitignore             # 忽略 cmd.txt / input.txt
+```
+
+## 部署方式
+
+```bash
+python install.py -a                    # 安装用户级 AGENTS.md + dev.sample.md
+python install.py -p <项目根目录>         # 安装项目级 opencode.json + run_cmd.py
+python install.py -a -p <项目根目录>      # 两者都安装
+```
+
+## 重要约定
+
+- **修改本仓库文件时，注意 `user/` 下的三个文件是"部署源"**：改它们等于改变所有目标机器的配置。
+- `.opencode/script/cmd.txt`、`input.txt` 是运行时产物，已被忽略，**不要提交**。
+- 新增功能或约定时，同步更新本文件与 `README.md`。
