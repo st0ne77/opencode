@@ -35,6 +35,12 @@ def main() -> int:
         sys.stderr.write("[run_cmd] cmd.txt 为空\n")
         return 2
 
+    lines = [ln.strip() for ln in cmd.splitlines()]
+    lines = [ln for ln in lines if ln]
+    if not lines:
+        sys.stderr.write("[run_cmd] cmd.txt 无有效命令\n")
+        return 2
+
     stdin_data = None
     if os.path.isfile(INPUT_FILE):
         with open(INPUT_FILE, "r", encoding="utf-8") as f:
@@ -46,26 +52,33 @@ def main() -> int:
         timeout = 600
     timeout_arg = None if timeout <= 0 else timeout
 
-    try:
-        result = subprocess.run(
-            cmd,
-            shell=True,
-            cwd=PROJECT_DIR,
-            input=stdin_data,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout_arg,
-        )
-    except subprocess.TimeoutExpired as exc:
-        if exc.stdout:
-            sys.stdout.write(exc.stdout)
-        if exc.stderr:
-            sys.stderr.write(exc.stderr)
-        sys.stderr.write("\n[run_cmd] 超时(%ss)已终止\n" % timeout)
-        return 124
+    multi = len(lines) > 1
+    returncode = 0
+    for idx, line in enumerate(lines):
+        if multi:
+            sys.stdout.write("[%d/%d] %s\n" % (idx + 1, len(lines), line))
+            sys.stdout.flush()
+        try:
+            result = subprocess.run(
+                line,
+                shell=True,
+                cwd=PROJECT_DIR,
+                input=stdin_data if idx == 0 else None,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout_arg,
+            )
+        except subprocess.TimeoutExpired as exc:
+            if exc.stdout:
+                sys.stdout.write(exc.stdout)
+            if exc.stderr:
+                sys.stderr.write(exc.stderr)
+            sys.stderr.write("\n[run_cmd] 超时(%ss)已终止: %s\n" % (timeout, line))
+            return 124
+        returncode = result.returncode
 
-    return result.returncode
+    return returncode
 
 
 if __name__ == "__main__":
