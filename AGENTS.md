@@ -17,12 +17,15 @@
 
 **所有 shell 命令必须且只能通过 python 通道执行，opencode 权限已硬性拦截其它所有 bash 命令。**
 
-- 唯一被放行的命令是：`python .opencode/script/run_cmd.py`
+- 唯一被放行的命令是（二选一，先探测哪个可用）：
+  - Windows 通常：`python .opencode/script/run_cmd.py`
+  - Linux 通常：`python3 .opencode/script/run_cmd.py`
+  - **首次使用前先探测**：`python --version` 可用则用 `python`，否则用 `python3`（两者都已在权限中放行）。
   - **路径必须写正斜杠**，与权限配置字面严格一致；写成反斜杠会被拒绝。
   - 不需要、也不允许追加其它参数。
 - 执行任何命令的标准两步流程：
   1. 用 write 工具把命令原文写入 `<工作目录>/.opencode/script/cmd.txt`（UTF-8）。
-  2. 调用 `python .opencode/script/run_cmd.py` 执行。
+  2. 调用 `python .opencode/script/run_cmd.py`（Linux 用 `python3`）执行。
 - 需要向子进程 stdin 提供输入时，用 write 工具把输入内容写入 `<工作目录>/.opencode/script/input.txt`（UTF-8），执行器会一次性投喂。
 - `.opencode/script/` 目录或 `run_cmd.py` 不存在时，先用 write 工具创建（write 工具不受 bash 权限限制）。
 - 命令原文直接写进 cmd.txt，不要再操心 shell 转义：`$`、`%`、`&`、管道、重定向均可按目标 shell 语法原样书写。

@@ -9,8 +9,9 @@ opencode 的跨设备同步配置仓库（私有）。
 ```
 opencode-config/
 ├── README.md                # 本文件
-├── AGENTS.md                # opencode 全局规则（复制到 ~/.config/opencode/AGENTS.md）
-├── opencode.json            # 提炼版配置（仅 permission，复制到 ~/.config/opencode/opencode.json）
+├── install.py               # 跨平台安装脚本
+├── AGENTS.md                # opencode 全局规则（安装到 ~/.config/opencode/AGENTS.md）
+├── opencode.json            # 项目级配置（仅 permission，安装到项目根 opencode.json）
 └── .opencode/script/
     ├── run_cmd.py           # 统一命令执行器
     └── .gitignore           # 忽略 cmd.txt / input.txt
@@ -43,11 +44,29 @@ opencode-config/
 
 ## 新设备部署
 
-1. clone 本仓库
-2. 将 `AGENTS.md` 复制/软链到 `~/.config/opencode/AGENTS.md`
-3. 将 `opencode.json` 的 `permission` 合并到 `~/.config/opencode/opencode.json`（**注意保留本机原有的 provider / mcp / apiKey，本仓库不保存密钥**）
-4. 需要命令通道的项目中，确保存在 `.opencode/script/run_cmd.py`
-5. 重启 opencode 使权限生效
+使用 `install.py`（跨平台，Windows / Linux 通用）。**必须显式指定安装项，脚本不默认安装任何内容。**
+
+```bash
+git clone https://github.com/st0ne77/opencode.git
+cd opencode
+
+python install.py -a                     # 安装用户级 AGENTS.md
+python install.py -p <项目根目录>         # 安装项目级配置到指定项目
+python install.py -a -p <项目根目录>      # 两者都安装
+python install.py                        # 仅打印用法
+```
+
+Windows 下若 `python` 不可用，改用 `python3`。
+
+| 参数 | 说明 | 目标位置 |
+|---|---|---|
+| `-a` / `--agents` | 安装用户级规则 | `~/.config/opencode/AGENTS.md`（已存在则备份 `.bak`） |
+| `-p` / `--project DIR` | 安装项目级配置 + 执行器 | `<DIR>/opencode.json` 与 `<DIR>/.opencode/script/run_cmd.py` |
+
+安装完成后**重启 opencode** 使权限生效。
+
+> 项目级 `opencode.json` 放在**项目根目录**（opencode 文档规定项目配置位于项目根；配置文件是合并语义，项目级覆盖全局级）。
+
 
 ## 安全说明
 
