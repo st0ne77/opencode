@@ -8,6 +8,25 @@
     },
     "external_directory": {
       "C:/Users/65001/.config/opencode/dev.md": "allow"
+    },
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*.pem": "deny",
+      "*.key": "deny",
+      "id_rsa": "deny",
+      "id_rsa.*": "deny",
+      "id_ed25519": "deny",
+      "id_ed25519.*": "deny",
+      ".npmrc": "deny",
+      ".netrc": "deny",
+      "*.p12": "deny",
+      "*.pfx": "deny",
+      "*.keystore": "deny",
+      "credentials": "deny",
+      "credentials.json": "deny"
     }
   }
 }
