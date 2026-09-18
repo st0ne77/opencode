@@ -11,7 +11,7 @@
     },
     "edit": {
       "*": "allow",
-      "~/.config/opencode/**": "ask"
+      "**/dev.md": "deny"
     },
     "read": {
       "*": "allow",

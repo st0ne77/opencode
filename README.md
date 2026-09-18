@@ -11,14 +11,26 @@ opencode-config/
 ├── AGENTS.md                # 本项目目的说明（同时被 opencode 当规则加载）
 ├── README.md                # 本文件
 ├── install.py               # 跨平台安装脚本
-├── user/                    # 部署源（会被 install.py 安装到目标机器）
-│   ├── AGENTS.md            # 全局规则 -> ~/.config/opencode/AGENTS.md
-│   ├── dev.sample.md        # 本地环境配置示例 -> ~/.config/opencode/dev.sample.md
-│   └── opencode.json        # 项目级权限 -> <项目根>/opencode.json
-└── .opencode/script/
-    ├── run_cmd.py           # 统一命令执行器
-    └── .gitignore           # 忽略 cmd.txt / input.txt
+└── user/                    # 部署源（会被 install.py 安装到目标机器）
+    ├── AGENTS.md            # 全局规则 -> ~/.config/opencode/AGENTS.md
+    ├── opencode.json        # 全局权限 -> ~/.config/opencode/opencode.json
+    ├── dev.sample.md        # 本地环境配置示例 -> <项目>/.opencode/dev.sample.md
+    ├── opencode.gitignore   # 项目忽略规则 -> <项目>/.opencode/.gitignore
+    └── script/
+        └── run_cmd.py       # 命令执行器 -> <项目>/.opencode/script/run_cmd.py
 ```
+
+## 部署目标
+
+| 源 | 目标 | 级别 |
+|---|---|---|
+| `user/AGENTS.md` | `~/.config/opencode/AGENTS.md` | 用户级（全局，所有项目） |
+| `user/opencode.json` | `~/.config/opencode/opencode.json` | 用户级（全局，所有项目） |
+| `user/dev.sample.md` | `<项目>/.opencode/dev.sample.md` | 项目级 |
+| `user/opencode.gitignore` | `<项目>/.opencode/.gitignore` | 项目级 |
+| `user/script/run_cmd.py` | `<项目>/.opencode/script/run_cmd.py` | 项目级 |
+
+> **为什么这样分层**：`AGENTS.md` / `opencode.json` 由 opencode **原生读取**（无需 `external_directory`）；`run_cmd.py`、`cmd.txt`、`dev.md` 放在**项目工作区内**，避免触发 `external_directory` 粗粒度开关，从而让 `edit` 等细粒度权限规则保持有效。
 
 ## 工作原理
 
@@ -27,16 +39,16 @@ opencode-config/
 | 层 | 机制 | 作用 |
 |---|---|---|
 | L1 | `user/AGENTS.md` 规则 | 要求所有命令走 python 通道（软约束） |
-| L2 | `run_cmd.py` | 强制 UTF-8 输出、统一读 cmd.txt、预置 stdin、超时杀进程树、退出码回传 |
+| L2 | `run_cmd.py` | 强制 UTF-8 输出、读同目录 cmd.txt、以项目根为 cwd、预置 stdin、超时杀进程树、退出码回传 |
 | L3 | `user/opencode.json` 权限 | `bash` 全 `deny`，仅放行 python 通道（硬拦截） |
 
 ### 命令执行流程
 
-1. 用 write 工具把命令原文写入 `<工作目录>/.opencode/script/cmd.txt`（UTF-8）
-2. 执行 `python .opencode/script/run_cmd.py`
-3. 脚本读 cmd.txt，以项目根为 cwd 用 cmd.exe 执行，输出统一 UTF-8
+1. 用 write 工具把命令原文写入 `<项目>/.opencode/script/cmd.txt`（UTF-8）
+2. 执行 `python .opencode/script/run_cmd.py`（cwd = 项目根）
+3. 脚本读 cmd.txt，以**业务项目根**为 cwd 用 cmd.exe 执行，输出统一 UTF-8
 
-需要 stdin 输入时，写入 `.opencode/script/input.txt`，脚本会一次性投喂。
+需要 stdin 输入时，写入 `<项目>/.opencode/script/input.txt`，脚本会一次性投喂。
 
 ### 超时看门狗
 
@@ -50,13 +62,17 @@ opencode-config/
 - **cmd.exe 内建命令的中文**（如 `echo 中文`）按 GBK 输出，会乱码；需要中文输出时用 python 产生。
 - **转义未 100% 消除**：`shell=True` 走 cmd.exe，`%`、`&` 仍按 cmd 规则解释；消除的是 PowerShell 那层与编码乱码。
 - 权限为 `"*": "deny"` 单条放行，容错为零：若匹配失败会锁死会话，需手动把 `"*"` 改回 `"ask"` 排障。
+- **`external_directory` 是粗粒度二选一开关**：对某路径设 `allow` 后，该路径**完全继承工作区默认权限，同路径的 `read`/`edit` 细粒度规则全部失效**（实测 opencode 1.18.18，官方文档所述 "allow + edit deny" 组合实际无效）。因此 `run_cmd.py`、`dev.md` 一律放在项目工作区内，不依赖 `external_directory`。
 
 ### 权限配置要点（`user/opencode.json`）
 
-- `external_directory` 放行 `~/.config/opencode/**`，使 agent 能跨机器免申请读取 `dev.md` / `AGENTS.md`。
+- `bash` 放行规则匹配**命令字符串**，使用项目内相对路径：`python .opencode/script/run_cmd.py*`（含 `python3`）。
+  - 相对路径基于**调用时的 cwd**（项目根），opencode 不展开 `~`，故**禁止在命令里用 `~`**。
+- `external_directory` 放行 `~/.config/opencode/**`，使 agent 能免申请读取用户级 `AGENTS.md` 等。
   - 注意：`external_directory` 必须用**目录通配 `**`**，精确到具体文件不生效。
-- `edit` 对 `~/.config/opencode/**` 设为 `ask`：改动该目录下的配置文件需要审批，防止密钥被篡改。
-- `read` 拒绝读取 `.env`、`*.pem`、`*.key`、`id_rsa*`、`.npmrc`、`.netrc`、`credentials*` 等敏感文件（但允许覆盖编辑）。
+- `read` 拒绝读取 `.env`、`*.pem`、`*.key`、`id_rsa*`、`.npmrc`、`.netrc`、`credentials*` 等敏感文件。
+- `edit` 默认 `allow`，但 `**/dev.md` 设为 `deny`：项目内 `dev.md` 含本机密钥，禁止 agent 改写。
+  - 该规则**仅在文件位于工作区内时有效**；用户级目录的写保护无法用 `edit` 规则实现（被 `external_directory` 架空），故不设置无效规则。
 
 ## 新设备部署
 
@@ -66,8 +82,8 @@ opencode-config/
 git clone https://github.com/st0ne77/opencode.git
 cd opencode
 
-python install.py -a                     # 安装用户级 AGENTS.md + dev.sample.md
-python install.py -p <项目根目录>         # 安装项目级配置到指定项目
+python install.py -a                     # 安装用户级配置（AGENTS.md + opencode.json）
+python install.py -p <项目根目录>         # 安装项目级配置到 <项目>/.opencode/
 python install.py -a -p <项目根目录>      # 两者都安装
 python install.py                        # 仅打印用法
 ```
@@ -76,21 +92,20 @@ Windows 下若 `python` 不可用，改用 `python3`。
 
 | 参数 | 说明 | 目标位置 |
 |---|---|---|
-| `-a` / `--agents` | 安装用户级规则与示例 | `~/.config/opencode/AGENTS.md`、`~/.config/opencode/dev.sample.md`（已存在则备份 `.bak`） |
-| `-p` / `--project DIR` | 安装项目级配置 + 执行器 | `<DIR>/opencode.json` 与 `<DIR>/.opencode/script/run_cmd.py` |
+| `-a` / `--agents` | 安装用户级配置 | `~/.config/opencode/AGENTS.md`、`~/.config/opencode/opencode.json`（已存在则备份 `.bak`） |
+| `-p` / `--project DIR` | 安装项目级配置 | `<DIR>/.opencode/dev.sample.md`、`<DIR>/.opencode/.gitignore`、`<DIR>/.opencode/script/run_cmd.py`（已存在则备份 `.bak`） |
 
 安装完成后**重启 opencode** 使权限生效。
 
 ### 本地环境配置（dev.md）
 
-每台机器的数据库连接、内网地址等本机信息放在 `~/.config/opencode/dev.md`，**该文件不入库**。
+每台（项目所在）机器的数据库连接、内网地址等本机信息放在 `<项目>/.opencode/dev.md`，**该文件不入库**（已被 `.opencode/.gitignore` 忽略）。
 
-- `-a` 会把仓库里的 `dev.sample.md` 安装到 `~/.config/opencode/dev.sample.md` 作为示例模板。
+- `-p` 会把仓库里的 `dev.sample.md` 安装到 `<项目>/.opencode/dev.sample.md` 作为示例模板。
 - 需要本地环境配置时，把 `dev.sample.md` 复制为同目录的 `dev.md`，填入本机真实值。
 - `dev.md` 不存在时，agent 会静默跳过读取，不报错。
 
-> 项目级 `opencode.json` 放在**项目根目录**（opencode 文档规定项目配置位于项目根；配置文件是合并语义，项目级覆盖全局级）。
-
+> opencode 配置文件是**合并语义**：用户级 `~/.config/opencode/opencode.json` 对所有项目生效，项目级会覆盖同名键。
 
 ## 安全说明
 

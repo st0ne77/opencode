@@ -3,16 +3,23 @@
 """opencode-config 跨平台安装脚本。
 
 用法:
-    python install.py -a                     # 安装用户级 AGENTS.md
-    python install.py -p <项目根目录>         # 安装项目级 opencode.json + run_cmd.py
+    python install.py -a                     # 安装用户级配置
+    python install.py -p <项目根目录>         # 安装项目级配置
     python install.py -a -p <项目根目录>      # 两者都安装
     python install.py                        # 打印用法
 
 说明:
-    -a/--agents   复制 <repo>/user/AGENTS.md 到 ~/.config/opencode/AGENTS.md（已存在则备份 .bak），
-                  并复制 <repo>/user/dev.sample.md 到 ~/.config/opencode/dev.sample.md
-    -p/--project  在 <项目根>/.opencode/script/ 下部署 run_cmd.py，
-                  并把 <repo>/user/opencode.json 复制到 <项目根>/opencode.json
+    -a/--agents   把下列内容安装到 ~/.config/opencode/（已存在则备份 .bak）：
+                    user/AGENTS.md        -> ~/.config/opencode/AGENTS.md
+                    user/opencode.json    -> ~/.config/opencode/opencode.json
+
+    -p/--project  把下列内容安装到 <项目根>/.opencode/（已存在则备份 .bak）：
+                    user/dev.sample.md        -> <项目根>/.opencode/dev.sample.md
+                    user/script/run_cmd.py    -> <项目根>/.opencode/script/run_cmd.py
+                    user/opencode.gitignore   -> <项目根>/.opencode/.gitignore
+
+    AGENTS.md 与 opencode.json 为**用户级全局配置**，对所有项目生效；
+    dev.md、run_cmd.py、cmd.txt 等留在**项目** .opencode/ 内，不触发 external_directory。
 
 Windows 与 Linux 通用；用户配置目录统一为 ~/.config/opencode。
 """
@@ -45,24 +52,23 @@ def backup_if_exists(path: Path) -> None:
         log("  已备份: %s" % bak)
 
 
-def install_agents() -> int:
-    src = USER_DIR / "AGENTS.md"
+def _install_file(src: Path, dst: Path, label: str) -> int:
     if not src.is_file():
-        sys.stderr.write("[错误] 仓库中缺少 user/AGENTS.md: %s\n" % src)
+        sys.stderr.write("[错误] 仓库中缺少 %s: %s\n" % (label, src))
         return 1
-    dst = USER_CONFIG_DIR / "AGENTS.md"
-    USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    dst.parent.mkdir(parents=True, exist_ok=True)
     backup_if_exists(dst)
     shutil.copy2(src, dst)
-    log("已安装用户级 AGENTS.md -> %s" % dst)
-
-    sample_src = USER_DIR / "dev.sample.md"
-    if sample_src.is_file():
-        sample_dst = USER_CONFIG_DIR / "dev.sample.md"
-        backup_if_exists(sample_dst)
-        shutil.copy2(sample_src, sample_dst)
-        log("已安装示例配置 -> %s" % sample_dst)
+    log("已安装%s -> %s" % (label, dst))
     return 0
+
+
+def install_agents() -> int:
+    USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    rc = 0
+    rc |= _install_file(USER_DIR / "AGENTS.md", USER_CONFIG_DIR / "AGENTS.md", "用户级 AGENTS.md")
+    rc |= _install_file(USER_DIR / "opencode.json", USER_CONFIG_DIR / "opencode.json", "全局权限配置")
+    return rc
 
 
 def install_project(project: str) -> int:
@@ -71,25 +77,12 @@ def install_project(project: str) -> int:
         sys.stderr.write("[错误] 项目目录不存在: %s\n" % root)
         return 1
 
-    runner_src = REPO_DIR / ".opencode" / "script" / "run_cmd.py"
-    if not runner_src.is_file():
-        sys.stderr.write("[错误] 仓库中缺少 run_cmd.py: %s\n" % runner_src)
-        return 1
-    runner_dst = root / ".opencode" / "script" / "run_cmd.py"
-    runner_dst.parent.mkdir(parents=True, exist_ok=True)
-    backup_if_exists(runner_dst)
-    shutil.copy2(runner_src, runner_dst)
-    log("已安装命令执行器 -> %s" % runner_dst)
-
-    config_src = USER_DIR / "opencode.json"
-    if not config_src.is_file():
-        sys.stderr.write("[错误] 仓库中缺少 user/opencode.json: %s\n" % config_src)
-        return 1
-    config_dst = root / "opencode.json"
-    backup_if_exists(config_dst)
-    shutil.copy2(config_src, config_dst)
-    log("已安装项目级配置 -> %s" % config_dst)
-    return 0
+    oc_dir = root / ".opencode"
+    rc = 0
+    rc |= _install_file(USER_DIR / "dev.sample.md", oc_dir / "dev.sample.md", "示例配置")
+    rc |= _install_file(USER_DIR / "script" / "run_cmd.py", oc_dir / "script" / "run_cmd.py", "命令执行器")
+    rc |= _install_file(USER_DIR / "opencode.gitignore", oc_dir / ".gitignore", "项目 gitignore")
+    return rc
 
 
 def main() -> int:
@@ -101,11 +94,11 @@ def main() -> int:
     )
     parser.add_argument(
         "-a", "--agents", action="store_true",
-        help="安装用户级 AGENTS.md 和 dev.sample.md 到 ~/.config/opencode/",
+        help="安装用户级配置到 ~/.config/opencode/（AGENTS.md、opencode.json）",
     )
     parser.add_argument(
         "-p", "--project", metavar="DIR",
-        help="安装项目级配置到指定项目根目录（opencode.json + .opencode/script/run_cmd.py）",
+        help="安装项目级配置到 <DIR>/.opencode/（dev.sample.md、script/run_cmd.py、.gitignore）",
     )
     args = parser.parse_args()
 

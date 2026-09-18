@@ -5,6 +5,11 @@
 用法:
     python .opencode/script/run_cmd.py
 
+说明:
+    - 部署在各业务项目的 .opencode/script/run_cmd.py。
+    - cmd.txt / input.txt 与执行器同目录（<项目>/.opencode/script/）。
+    - 命令以**业务项目根**（.opencode 的上级目录）为 cwd 执行。
+
 可选:
     input.txt  存在时，其内容作为子进程 stdin（一次性投喂）
     环境变量 RUN_CMD_TIMEOUT  超时秒数，默认 600；0 表示不限制

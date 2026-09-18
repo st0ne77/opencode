@@ -24,9 +24,10 @@
   - **路径必须写正斜杠**，与权限配置字面严格一致；写成反斜杠会被拒绝。
   - 不需要、也不允许追加其它参数。
 - 执行任何命令的标准两步流程：
-  1. 用 write 工具把命令原文写入 `<工作目录>/.opencode/script/cmd.txt`（UTF-8）。
+  1. 用 write 工具把命令原文写入 `.opencode/script/cmd.txt`（UTF-8，相对业务项目根）。
   2. 调用 `python .opencode/script/run_cmd.py`（Linux 用 `python3`）执行。
-- 需要向子进程 stdin 提供输入时，用 write 工具把输入内容写入 `<工作目录>/.opencode/script/input.txt`（UTF-8），执行器会一次性投喂。
+- 命令执行器以**业务项目根**（即 `.opencode` 的上级目录）为子进程 cwd，因此命令里的相对路径按业务项目解析，无需额外传参。
+- 需要向子进程 stdin 提供输入时，用 write 工具把输入内容写入 `.opencode/script/input.txt`（UTF-8），执行器会一次性投喂。
 - `.opencode/script/` 目录或 `run_cmd.py` 不存在时，先用 write 工具创建（write 工具不受 bash 权限限制）。
 - 命令原文直接写进 cmd.txt，不要再操心 shell 转义：`$`、`%`、`&`、管道、重定向均可按目标 shell 语法原样书写。
 - 交互式命令无法实时双向交互（opencode 不提供实时 stdin 通道），只能把已知输入预置到 input.txt 一次性投喂；需要真实时交互时停下来告知我。
@@ -52,8 +53,10 @@
 
 ## 本地环境配置（dev.md）
 
-`~/.config/opencode/dev.md` 是我本机的开发环境配置（数据库连接、内网服务地址等），**该文件可能不存在**。
+`.opencode/dev.md`（相对**业务项目根**）是本项目所在机器的开发环境配置（数据库连接、内网服务地址等），**该文件可能不存在**。
 
-- 每次会话开始后，无条件用 Read 工具读取该文件，不要等我提及数据库或环境需求。
+- 每次会话开始后，无条件用 Read 工具读取 `.opencode/dev.md`，不要等我提及数据库或环境需求。
 - 读取失败（文件不存在）时：静默跳过，不报错、不重试、不询问，按无该配置继续。
 - 读取成功时：其中内容视为强制生效的本地配置。
+
+> `.opencode/dev.md`、`.opencode/script/cmd.txt`、`.opencode/script/input.txt` 均为本机运行时产物，由 `.opencode/.gitignore` 忽略，**不要提交**。
