@@ -14,6 +14,8 @@ opencode-config/
 └── user/                    # 部署源（会被 install.py 安装到目标机器）
     ├── AGENTS.md            # 全局规则 -> ~/.config/opencode/AGENTS.md
     ├── opencode.json        # 全局权限 -> ~/.config/opencode/opencode.json
+    ├── agents/              # 自定义 agent -> ~/.config/opencode/agents/*.md
+    │   └── test-engineer.md # 自动化测试工程师
     ├── dev.sample.md        # 本地环境配置示例 -> <项目>/.opencode/dev.sample.md
     ├── opencode.gitignore   # 项目忽略规则 -> <项目>/.opencode/.gitignore
     └── script/
@@ -26,6 +28,7 @@ opencode-config/
 |---|---|---|
 | `user/AGENTS.md` | `~/.config/opencode/AGENTS.md` | 用户级（全局，所有项目） |
 | `user/opencode.json` | `~/.config/opencode/opencode.json` | 用户级（全局，所有项目） |
+| `user/agents/*.md` | `~/.config/opencode/agents/*.md` | 用户级（全局，所有项目） |
 | `user/dev.sample.md` | `<项目>/.opencode/dev.sample.md` | 项目级 |
 | `user/opencode.gitignore` | `<项目>/.opencode/.gitignore` | 项目级 |
 | `user/script/run_cmd.py` | `<项目>/.opencode/script/run_cmd.py` | 项目级 |
@@ -82,7 +85,7 @@ opencode-config/
 git clone https://github.com/st0ne77/opencode.git
 cd opencode
 
-python install.py -a                     # 安装用户级配置（AGENTS.md + opencode.json）
+python install.py -a                     # 安装用户级配置（AGENTS.md + opencode.json + agents/）
 python install.py -p <项目根目录>         # 安装项目级配置到 <项目>/.opencode/
 python install.py -a -p <项目根目录>      # 两者都安装
 python install.py                        # 仅打印用法
@@ -92,7 +95,7 @@ Windows 下若 `python` 不可用，改用 `python3`。
 
 | 参数 | 说明 | 目标位置 |
 |---|---|---|
-| `-a` / `--agents` | 安装用户级配置 | `~/.config/opencode/AGENTS.md`、`~/.config/opencode/opencode.json`（已存在则备份 `.bak`） |
+| `-a` / `--agents` | 安装用户级配置 | `~/.config/opencode/AGENTS.md`、`~/.config/opencode/opencode.json`、`~/.config/opencode/agents/*.md`（已存在则备份 `.bak`） |
 | `-p` / `--project DIR` | 安装项目级配置 | `<DIR>/.opencode/dev.sample.md`、`<DIR>/.opencode/.gitignore`、`<DIR>/.opencode/script/run_cmd.py`（已存在则备份 `.bak`） |
 
 安装完成后**重启 opencode** 使权限生效。
@@ -106,6 +109,23 @@ Windows 下若 `python` 不可用，改用 `python3`。
 - `dev.md` 不存在时，agent 会静默跳过读取，不报错。
 
 > opencode 配置文件是**合并语义**：用户级 `~/.config/opencode/opencode.json` 对所有项目生效，项目级会覆盖同名键。
+
+## 自定义 Agent
+
+`user/agents/*.md` 由 `-a` 安装到 `~/.config/opencode/agents/`，对所有项目生效。当前提供：
+
+| Agent | mode | 用途 |
+|---|---|---|
+| `test-engineer` | `all` | 自动化测试工程师：后端接口测试（dbhub + python 通道）、前端 Web 页面测试（chrome-devtools）；只写测试代码，发现业务缺陷只报告不改实现 |
+
+用法：
+
+- **作为主 agent**：会话中切换到 `test-engineer`，直接让它测。
+- **作为 subagent**：对主 agent 说「用 test-engineer 子代理测一下 XX 接口 / XX 页面」。
+
+权限要点：`edit` 默认 `deny`，仅放行测试路径（`*test/*`、`*tests/*`、`*__tests__/*`、`*e2e/*`、`*integration_test/*`、`*_test.*`、`*.test.*`、`*.spec.*`、`*test_*.*`、`*test-*.*`、`*conftest.py`），确保它只能在测试代码里动刀；`shell` 沿用全局，仍只走 python 通道。
+
+新增自定义 agent：在 `user/agents/` 下加 `<name>.md`（frontmatter + Markdown 正文作为 system prompt），重新执行 `python install.py -a` 即可。
 
 ## 安全说明
 

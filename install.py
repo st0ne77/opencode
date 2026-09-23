@@ -12,6 +12,7 @@
     -a/--agents   把下列内容安装到 ~/.config/opencode/（已存在则备份 .bak）：
                     user/AGENTS.md        -> ~/.config/opencode/AGENTS.md
                     user/opencode.json    -> ~/.config/opencode/opencode.json
+                    user/agents/*.md      -> ~/.config/opencode/agents/*.md（逐个，不删除同名以外文件）
 
     -p/--project  把下列内容安装到 <项目根>/.opencode/（已存在则备份 .bak）：
                     user/dev.sample.md        -> <项目根>/.opencode/dev.sample.md
@@ -63,11 +64,26 @@ def _install_file(src: Path, dst: Path, label: str) -> int:
     return 0
 
 
+def install_agent_definitions() -> int:
+    src_dir = USER_DIR / "agents"
+    if not src_dir.is_dir():
+        log("  跳过 agents：仓库中无 user/agents/ 目录")
+        return 0
+    rc = 0
+    for src in sorted(src_dir.rglob("*.md")):
+        rel = src.relative_to(src_dir)
+        rc |= _install_file(
+            src, USER_CONFIG_DIR / "agents" / rel, "agent 定义 %s" % rel.as_posix()
+        )
+    return rc
+
+
 def install_agents() -> int:
     USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     rc = 0
     rc |= _install_file(USER_DIR / "AGENTS.md", USER_CONFIG_DIR / "AGENTS.md", "用户级 AGENTS.md")
     rc |= _install_file(USER_DIR / "opencode.json", USER_CONFIG_DIR / "opencode.json", "全局权限配置")
+    rc |= install_agent_definitions()
     return rc
 
 
@@ -94,7 +110,7 @@ def main() -> int:
     )
     parser.add_argument(
         "-a", "--agents", action="store_true",
-        help="安装用户级配置到 ~/.config/opencode/（AGENTS.md、opencode.json）",
+        help="安装用户级配置到 ~/.config/opencode/（AGENTS.md、opencode.json、agents/*.md）",
     )
     parser.add_argument(
         "-p", "--project", metavar="DIR",
