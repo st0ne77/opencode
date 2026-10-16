@@ -41,6 +41,8 @@ opencode/
     ├── opencode.json          # 全局权限模板 -> ~/.config/opencode/opencode.json
     ├── dev.sample.md          # 本地环境配置示例 -> <项目>/.opencode/dev.sample.md
     ├── opencode.gitignore     # 项目忽略规则 -> <项目>/.opencode/.gitignore
+    ├── agents/                # 自定义 agent 定义目录
+    │   └── test-engineer.md   # 自动化测试工程师 -> ~/.config/opencode/agents/
     └── script/
         └── run_cmd.py         # 命令执行器 -> <项目>/.opencode/script/run_cmd.py
 ```
@@ -48,7 +50,7 @@ opencode/
 ## 部署方式
 
 ```bash
-python install.py -a                     # 安装用户级配置（AGENTS.md + opencode.json）
+python install.py -a                     # 安装用户级配置（AGENTS.md + opencode.json + agents/）
 python install.py -p <项目根目录>         # 安装项目级配置到 <项目>/.opencode/
 python install.py -a -p <项目根目录>      # 两者都安装
 python install.py                        # 仅打印用法
