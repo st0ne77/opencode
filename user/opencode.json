@@ -3,8 +3,8 @@
   "permission": {
     "bash": {
       "*": "deny",
-      "python .opencode/script/run_cmd.py*": "allow",
-      "python3 .opencode/script/run_cmd.py*": "allow"
+      "python .opencode/script/run_cmd.py *": "allow",
+      "python3 .opencode/script/run_cmd.py *": "allow"
     },
     "external_directory": {
       "~/.config/opencode/**": "allow"

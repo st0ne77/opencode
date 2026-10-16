@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""统一命令执行器：读 cmd.txt 执行，统一 UTF-8 输出。
+"""统一命令执行器：读命令文件执行，统一 UTF-8 输出。
 
 用法:
-    python .opencode/script/run_cmd.py
+    python .opencode/script/run_cmd.py [命令文件名]
 
 说明:
     - 部署在各业务项目的 .opencode/script/run_cmd.py。
-    - cmd.txt / input.txt 与执行器同目录（<项目>/.opencode/script/）。
+    - 命令文件与执行器同目录（<项目>/.opencode/script/）。
+    - 不传参数：读 cmd.txt（主代理默认）。
+    - 传参数：读 <参数>，例如 cmd_attack.txt；用于**多子代理并行**时各用独立命令文件，
+      避免多个代理读写同一个 cmd.txt 互相覆盖。
+    - 参数只取文件名 basename（禁止路径），可省略 .txt。
     - 命令以**业务项目根**（.opencode 的上级目录）为 cwd 执行。
 
 可选:
-    input.txt  存在时，其内容作为子进程 stdin（一次性投喂）
+    stdin 文件  与命令文件同源派生，存在时作为子进程 stdin（一次性投喂）：
+                cmd.txt -> input.txt；cmd_<名字>.txt -> input_<名字>.txt
     环境变量 RUN_CMD_TIMEOUT  超时秒数，默认 600；0 表示不限制
 """
 
@@ -22,13 +27,34 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
-CMD_FILE = os.path.join(SCRIPT_DIR, "cmd.txt")
-INPUT_FILE = os.path.join(SCRIPT_DIR, "input.txt")
 
 IS_WINDOWS = os.name == "nt"
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+
+def _resolve_files(argv):
+    """决定本次要读的命令文件与 stdin 文件。
+
+    - 无参数：cmd.txt / input.txt（主代理默认）。
+    - 有参数：<basename(argv[1])>，缺 .txt 自动补；stdin 文件按前缀派生：
+      cmd_<名字>.txt -> input_<名字>.txt，其它 -> input.txt。
+    多子代理并行时各自传入 cmd_<名字>.txt，读写互不覆盖。
+    """
+    name = "cmd.txt"
+    if len(argv) > 1 and argv[1].strip():
+        name = os.path.basename(argv[1].strip())
+        if not name.endswith(".txt"):
+            name += ".txt"
+    cmd_file = os.path.join(SCRIPT_DIR, name)
+
+    if name.startswith("cmd_") and name.endswith(".txt"):
+        input_name = "input_" + name[len("cmd_"):]
+    else:
+        input_name = "input.txt"
+    input_file = os.path.join(SCRIPT_DIR, input_name)
+    return cmd_file, input_file, name
 
 
 def _kill_tree(proc) -> None:
@@ -91,7 +117,7 @@ def _run_one(line: str, stdin_data) -> int:
             sys.stderr.write(err)
         sys.stdout.flush()
         sys.stderr.flush()
-        sys.stderr.write("\n[run_cmd] 超时(%ss)已终止整棵进程树: %s\n" % (timeout, line))
+        sys.stderr.write("\n[run_cmd] 超时(%ss)已终止整棵进程树: %s\n" % (timeout_arg, line))
         return 124
 
     if out:
@@ -102,26 +128,28 @@ def _run_one(line: str, stdin_data) -> int:
 
 
 def main() -> int:
-    if not os.path.isfile(CMD_FILE):
-        sys.stderr.write("[run_cmd] 缺少 cmd.txt: %s\n" % CMD_FILE)
+    cmd_file, input_file, name = _resolve_files(sys.argv)
+
+    if not os.path.isfile(cmd_file):
+        sys.stderr.write("[run_cmd] 缺少命令文件: %s\n" % cmd_file)
         return 2
 
-    with open(CMD_FILE, "r", encoding="utf-8") as f:
+    with open(cmd_file, "r", encoding="utf-8") as f:
         cmd = f.read().strip()
 
     if not cmd:
-        sys.stderr.write("[run_cmd] cmd.txt 为空\n")
+        sys.stderr.write("[run_cmd] %s 为空\n" % name)
         return 2
 
     lines = [ln.strip() for ln in cmd.splitlines()]
     lines = [ln for ln in lines if ln]
     if not lines:
-        sys.stderr.write("[run_cmd] cmd.txt 无有效命令\n")
+        sys.stderr.write("[run_cmd] %s 无有效命令\n" % name)
         return 2
 
     stdin_data = None
-    if os.path.isfile(INPUT_FILE):
-        with open(INPUT_FILE, "r", encoding="utf-8") as f:
+    if os.path.isfile(input_file):
+        with open(input_file, "r", encoding="utf-8") as f:
             stdin_data = f.read()
 
     try:

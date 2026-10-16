@@ -26,7 +26,7 @@ python 强制 UTF-8 输出，彻底绕开 shell 转义与编码差异
 | 层 | 位置 | 作用 |
 |---|---|---|
 | 规则 | `user/AGENTS.md` | 要求所有命令走 python 通道（软约束） |
-| 执行器 | `<项目>/.opencode/script/run_cmd.py` | 读同目录 cmd.txt、以项目根为 cwd、强制 UTF-8、逐行执行、超时/退出码回传 |
+| 执行器 | `<项目>/.opencode/script/run_cmd.py` | 读同目录命令文件（默认 cmd.txt，可传参 cmd_<名字>.txt 隔离并行）、以项目根为 cwd、强制 UTF-8、逐行执行、超时/退出码回传 |
 | 权限 | `user/opencode.json` | `bash` 全 deny，仅放行 python 通道（硬拦截） |
 
 ## 目录结构
@@ -60,5 +60,6 @@ python install.py                        # 仅打印用法
 - **`AGENTS.md` 与 `opencode.json` 部署到用户级**（`~/.config/opencode/`），对所有项目生效。
 - **`run_cmd.py`、`dev.md`、`.gitignore` 部署到项目级**（`<项目>/.opencode/`），避免触发 `external_directory` 粗粒度开关，从而保留细粒度权限规则的有效性。
 - `run_cmd.py` 以**业务项目根**（`.opencode` 的上级目录）为子进程 cwd，因此命令里的相对路径按业务项目解析。
-- `<项目>/.opencode/script/cmd.txt`、`input.txt`、`<项目>/.opencode/dev.md` 是运行时产物，由 `.opencode/.gitignore` 忽略，**不要提交**。
+- **多子代理并行**时，各子代理用独立命令文件 `cmd_<名字>.txt` 并把文件名作为参数传入（`run_cmd.py cmd_<名字>.txt`），避免共用 `cmd.txt` 互相覆盖；主代理仍用默认 `cmd.txt`。
+- `<项目>/.opencode/script/cmd.txt`、`cmd_*.txt`、`input.txt`、`input_*.txt`、`<项目>/.opencode/dev.md` 是运行时产物，由 `.opencode/.gitignore` 忽略，**不要提交**。
 - 新增功能或约定时，同步更新本文件与 `README.md`。

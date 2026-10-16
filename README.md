@@ -39,7 +39,7 @@ opencode-config/
 | 层 | 机制 | 作用 |
 |---|---|---|
 | L1 | `user/AGENTS.md` 规则 | 要求所有命令走 python 通道（软约束） |
-| L2 | `run_cmd.py` | 强制 UTF-8 输出、读同目录 cmd.txt、以项目根为 cwd、预置 stdin、超时杀进程树、退出码回传 |
+| L2 | `run_cmd.py` | 强制 UTF-8 输出、读同目录命令文件（默认 `cmd.txt`，可传参 `cmd_<名字>.txt` 隔离并行）、以项目根为 cwd、预置 stdin、超时杀进程树、退出码回传 |
 | L3 | `user/opencode.json` 权限 | `bash` 全 `deny`，仅放行 python 通道（硬拦截） |
 
 ### 命令执行流程
@@ -49,6 +49,20 @@ opencode-config/
 3. 脚本读 cmd.txt，以**业务项目根**为 cwd 用 cmd.exe 执行，输出统一 UTF-8
 
 需要 stdin 输入时，写入 `<项目>/.opencode/script/input.txt`，脚本会一次性投喂。
+
+### 多子代理并行（命令文件隔离）
+
+主代理并行拉起多个子代理时，它们共用同一 `.opencode/script/` 目录；若都写 `cmd.txt`，会在"写 → 读"两步之间被其它代理覆盖，执行到错误命令。执行器因此支持一个**可选命令文件名参数**：
+
+```bash
+python .opencode/script/run_cmd.py                    # 主代理：读 cmd.txt / input.txt
+python3 .opencode/script/run_cmd.py cmd_attack.txt    # 子代理：读 cmd_attack.txt / input_attack.txt
+```
+
+- 参数只取文件名 basename（禁止路径），可省略 `.txt`。
+- stdin 文件与命令文件同源派生：`cmd.txt -> input.txt`，`cmd_<名字>.txt -> input_<名字>.txt`。
+- 每个子代理用自己名字的文件，互不覆盖；权限规则 `...run_cmd.py *` 已覆盖带参与不带参两种调用。
+- `cmd_*.txt` / `input_*.txt` 均为运行时产物，由 `.opencode/.gitignore` 忽略。
 
 ### 超时看门狗
 
@@ -66,7 +80,8 @@ opencode-config/
 
 ### 权限配置要点（`user/opencode.json`）
 
-- `bash` 放行规则匹配**命令字符串**，使用项目内相对路径：`python .opencode/script/run_cmd.py*`（含 `python3`）。
+- `bash` 放行规则匹配**命令字符串**，使用项目内相对路径：`python .opencode/script/run_cmd.py *`（含 `python3`）。
+  - 结尾 ` *` 表示"允许一个可选参数位"，按 opencode 规则**同时匹配带参数与不带参数**两种调用；比原来的 `.py*`（会吞掉任意后缀）更精确。
   - 相对路径基于**调用时的 cwd**（项目根），opencode 不展开 `~`，故**禁止在命令里用 `~`**。
 - `external_directory` 放行 `~/.config/opencode/**`，使 agent 能免申请读取用户级 `AGENTS.md` 等。
   - 注意：`external_directory` 必须用**目录通配 `**`**，精确到具体文件不生效。

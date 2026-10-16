@@ -1,4 +1,6 @@
 dev.md
 script/cmd.txt
+script/cmd_*.txt
 script/input.txt
+script/input_*.txt
 script/__pycache__/

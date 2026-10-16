@@ -22,16 +22,27 @@
   - Linux 通常：`python3 .opencode/script/run_cmd.py`
   - **首次使用前先探测**：`python --version` 可用则用 `python`，否则用 `python3`（两者都已在权限中放行）。
   - **路径必须写正斜杠**，与权限配置字面严格一致；写成反斜杠会被拒绝。
-  - 不需要、也不允许追加其它参数。
+  - 默认不追加参数。**唯一例外（多子代理并行时）**：追加一个"命令文件名"参数以使用独立命令文件，避免多个代理互相覆盖，例如 `python3 .opencode/script/run_cmd.py cmd_attack.txt`（权限里的 `...run_cmd.py *` 已放行参数）。参数只取文件名 basename（禁止路径）、可省略 `.txt`。
 - 执行任何命令的标准两步流程：
-  1. 用 write 工具把命令原文写入 `.opencode/script/cmd.txt`（UTF-8，相对业务项目根）。
-  2. 调用 `python .opencode/script/run_cmd.py`（Linux 用 `python3`）执行。
+  1. 用 write 工具把命令原文写入 `.opencode/script/cmd.txt`（UTF-8，相对业务项目根）；**并行子代理**改写入 `.opencode/script/cmd_<名字>.txt`。
+  2. 调用 `python .opencode/script/run_cmd.py`（Linux 用 `python3`）执行；并行子代理带上文件名，如 `python3 .opencode/script/run_cmd.py cmd_<名字>.txt`。
 - 命令执行器以**业务项目根**（即 `.opencode` 的上级目录）为子进程 cwd，因此命令里的相对路径按业务项目解析，无需额外传参。
-- 需要向子进程 stdin 提供输入时，用 write 工具把输入内容写入 `.opencode/script/input.txt`（UTF-8），执行器会一次性投喂。
+- 需要向子进程 stdin 提供输入时，用 write 工具把输入内容写入 `.opencode/script/input.txt`（UTF-8），执行器会一次性投喂；并行子代理写同源派生的 `.opencode/script/input_<名字>.txt`。
 - `.opencode/script/` 目录或 `run_cmd.py` 不存在时，先用 write 工具创建（write 工具不受 bash 权限限制）。
 - 命令原文直接写进 cmd.txt，不要再操心 shell 转义：`$`、`%`、`&`、管道、重定向均可按目标 shell 语法原样书写。
 - 交互式命令无法实时双向交互（opencode 不提供实时 stdin 通道），只能把已知输入预置到 input.txt 一次性投喂；需要真实时交互时停下来告知我。
 - 常见坑：`echo 中文` 这类由 cmd.exe 内建命令产生的中文，仍可能按 GBK 输出导致乱码；需要输出中文时优先用 python 产生（python 全程 UTF-8）。
+
+### 多子代理并行（命令文件隔离）
+
+主代理用 `subagent` 并行拉起多个子代理时，它们**共用同一个** `.opencode/script/` 目录。若都往 `cmd.txt` 写，会在"写 → 读"两步之间被别的代理覆盖，执行到错误命令。
+
+- **每个子代理必须用独立命令文件** `cmd_<子代理名>.txt`，并把文件名作为参数传入。
+  例：attack-engineer 写 `cmd_attack.txt`，调用 `python3 .opencode/script/run_cmd.py cmd_attack.txt`。
+- 主代理自身仍用默认 `cmd.txt` / `input.txt`（不传参）。
+- 名字用子代理名或任务名即可，同一时刻**不得重名**；不同子代理天然不同名。
+- stdin 文件与命令文件同源派生：`cmd_<名字>.txt` ↔ `input_<名字>.txt`。
+- 这些文件均为本机运行产物，已被 `.opencode/.gitignore` 忽略，不要提交。
 
 ### 常驻服务启动规则（禁止死等）
 
@@ -59,4 +70,4 @@
 - 读取失败（文件不存在）时：静默跳过，不报错、不重试、不询问，按无该配置继续。
 - 读取成功时：其中内容视为强制生效的本地配置。
 
-> `.opencode/dev.md`、`.opencode/script/cmd.txt`、`.opencode/script/input.txt` 均为本机运行时产物，由 `.opencode/.gitignore` 忽略，**不要提交**。
+> `.opencode/dev.md`、`.opencode/script/cmd.txt`、`.opencode/script/input.txt`（及并行的 `cmd_*.txt` / `input_*.txt`）均为本机运行时产物，由 `.opencode/.gitignore` 忽略，**不要提交**。
